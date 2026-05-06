@@ -1,0 +1,27 @@
+det_model: "yolo11n.pt"
+pose_model: "yolo11n-pose.pt"
+trash_model: "models/trash_model.pt"   # auto-downloaded on first run
+db_path: "data/events.db"
+
+# Self-learning settings
+self_learning_enabled: true
+self_learning_conf_threshold: 0.70   # min confidence to collect a sample
+self_learning_min_samples: 50        # samples needed before fine-tune is offered
+fine_tuned_model: "models/fine_tuned.pt"
+
+crowd_threshold: 10
+trash_stationary_seconds: 30.0
+conflict_iou_threshold: 0.3
+conflict_velocity_threshold: 15.0
+conflict_frames_required: 5
+
+zones:
+  - name: "restricted_zone"
+    type: "RESTRICTED"
+    # Default: tiny top-left corner — move these coordinates to your actual restricted area
+    polygon: [[0, 0], [5, 0], [5, 5], [0, 5]]
+
+  - name: "trash_zone"
+    type: "TRASH"
+    # Default: tiny top-left corner — move these coordinates to your actual trash area
+    polygon: [[0, 0], [5, 0], [5, 5], [0, 5]]

@@ -1,0 +1,6 @@
+ultralytics>=8.3.0
+opencv-python>=4.9.0
+supervision>=0.22.0
+streamlit>=1.35.0
+pyyaml>=6.0.1
+numpy>=1.26.0
