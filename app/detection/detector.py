@@ -2,7 +2,19 @@ from dataclasses import dataclass, field
 from typing import Optional
 import numpy as np
 import supervision as sv
+import torch
 from ultralytics import YOLO
+
+
+def _best_device() -> str:
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
+DEVICE = _best_device()
 
 
 @dataclass
@@ -10,8 +22,8 @@ class ModelBundle:
     det_model: YOLO
     pose_model: YOLO
     trash_model: Optional[YOLO] = None
-    # Class names for the trash model (e.g. Glass, Metal, Paper, Plastic, Waste)
     trash_class_names: list = field(default_factory=list)
+    fight_model: Optional[YOLO] = None
 
 
 @dataclass
@@ -23,12 +35,16 @@ class DetectionResult:
     keypoints_xy: np.ndarray         # [M, 17, 2] from pose model
     sv_detections: Optional[sv.Detections] = field(default=None)
 
-    # Trash detections from dedicated trash model
+    # Trash detections
     trash_boxes_xyxy: np.ndarray = field(default_factory=lambda: np.empty((0, 4)))
     trash_track_ids: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=int))
     trash_class_ids: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=int))
     trash_confidences: np.ndarray = field(default_factory=lambda: np.empty(0))
     trash_sv_detections: Optional[sv.Detections] = field(default=None)
+
+    # Fight model detections
+    fight_boxes_xyxy: np.ndarray = field(default_factory=lambda: np.empty((0, 4)))
+    fight_confidences: np.ndarray = field(default_factory=lambda: np.empty(0))
 
     @property
     def person_mask(self) -> np.ndarray:
@@ -44,20 +60,28 @@ class DetectionResult:
 
 
 def load_models(det_path: str, pose_path: str,
-                trash_model_path: str = "") -> ModelBundle:
+                trash_model_path: str = "",
+                fight_model_path: str = "") -> ModelBundle:
+    import os
+
     trash_model = None
     trash_class_names = []
-
-    if trash_model_path and __import__("os").path.exists(trash_model_path):
+    if trash_model_path and os.path.exists(trash_model_path):
         trash_model = YOLO(trash_model_path)
         trash_class_names = list(trash_model.names.values())
         print(f"Trash model loaded: {trash_class_names}")
+
+    fight_model = None
+    if fight_model_path and os.path.exists(fight_model_path):
+        fight_model = YOLO(fight_model_path)
+        print("Fight model loaded.")
 
     return ModelBundle(
         det_model=YOLO(det_path),
         pose_model=YOLO(pose_path),
         trash_model=trash_model,
         trash_class_names=trash_class_names,
+        fight_model=fight_model,
     )
 
 
@@ -71,10 +95,10 @@ class Detector:
         self._tracker = sv.ByteTrack()
         self._trash_tracker = sv.ByteTrack()
 
-    def run(self, frame: np.ndarray) -> DetectionResult:
+    def run(self, frame: np.ndarray, run_heavy: bool = True) -> DetectionResult:
         # --- Person / general object detection ---
         det_results = self.bundle.det_model.track(
-            frame, persist=True, tracker="bytetrack.yaml", verbose=False
+            frame, persist=True, tracker="bytetrack.yaml", verbose=False, device=DEVICE
         )
         r = det_results[0]
 
@@ -102,7 +126,7 @@ class Detector:
             if sv_det.tracker_id is None:
                 sv_det.tracker_id = track_ids
 
-            pose_results = self.bundle.pose_model(frame, verbose=False)
+            pose_results = self.bundle.pose_model(frame, verbose=False, device=DEVICE)
             pr = pose_results[0]
             keypoints_xy = (
                 pr.keypoints.xy.cpu().numpy()
@@ -119,10 +143,10 @@ class Detector:
                 sv_detections=sv_det,
             )
 
-        # --- Dedicated trash model (if loaded) ---
-        if self.bundle.trash_model is not None:
+        # --- Dedicated trash model (if loaded) — skipped on light frames ---
+        if self.bundle.trash_model is not None and run_heavy:
             tr = self.bundle.trash_model.track(
-                frame, persist=True, tracker="bytetrack.yaml", verbose=False
+                frame, persist=True, tracker="bytetrack.yaml", verbose=False, device=DEVICE
             )[0]
             if tr.boxes is not None and len(tr.boxes) > 0:
                 base.trash_boxes_xyxy = tr.boxes.xyxy.cpu().numpy()
@@ -136,5 +160,12 @@ class Detector:
                 base.trash_sv_detections = sv.Detections.from_ultralytics(tr)
                 if base.trash_sv_detections.tracker_id is None:
                     base.trash_sv_detections.tracker_id = base.trash_track_ids
+
+        # --- Fight detection model — skipped on light frames ---
+        if self.bundle.fight_model is not None and run_heavy:
+            fr = self.bundle.fight_model(frame, verbose=False, device=DEVICE)[0]
+            if fr.boxes is not None and len(fr.boxes) > 0:
+                base.fight_boxes_xyxy = fr.boxes.xyxy.cpu().numpy()
+                base.fight_confidences = fr.boxes.conf.cpu().numpy()
 
         return base

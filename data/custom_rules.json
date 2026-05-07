@@ -1,0 +1,10 @@
+[
+  {
+    "objects": [
+      "car"
+    ],
+    "duration_seconds": 60,
+    "alert_name": "INVALID_PARKING",
+    "description": "Alert when car is parked in front of fire hydrant for more than one minute."
+  }
+]

@@ -3,6 +3,12 @@ pose_model: "yolo11n-pose.pt"
 trash_model: "models/trash_model.pt"   # auto-downloaded on first run
 db_path: "data/events.db"
 
+# Break-in detection settings
+breakin_loiter_seconds: 45.0        # person visible > this triggers loitering alert
+breakin_crouch_threshold: 0.75      # hip position ratio — higher = more crouched (0–1)
+breakin_after_hours_start: 23       # 11 PM (24h format)
+breakin_after_hours_end: 6          # 6 AM (24h format)
+
 # Self-learning settings
 self_learning_enabled: true
 self_learning_conf_threshold: 0.70   # min confidence to collect a sample
@@ -21,7 +27,5 @@ zones:
     # Default: tiny top-left corner — move these coordinates to your actual restricted area
     polygon: [[0, 0], [5, 0], [5, 5], [0, 5]]
 
-  - name: "trash_zone"
-    type: "TRASH"
-    # Default: tiny top-left corner — move these coordinates to your actual trash area
-    polygon: [[0, 0], [5, 0], [5, 5], [0, 5]]
+  # Trash zone no longer required — bin location is calibrated via the sidebar UI.
+  # You can still add a TRASH zone here if you prefer manual configuration.

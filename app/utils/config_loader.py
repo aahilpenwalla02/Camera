@@ -29,6 +29,11 @@ class AppConfig:
     conflict_velocity_threshold: float = 15.0
     conflict_frames_required: int = 5
     zones: List[ZoneConfig] = field(default_factory=list)
+    # Break-in detection
+    breakin_loiter_seconds: float = 45.0
+    breakin_crouch_threshold: float = 0.75
+    breakin_after_hours_start: int = 23
+    breakin_after_hours_end: int = 6
     # Self-learning
     self_learning_enabled: bool = True
     self_learning_conf_threshold: float = 0.70
@@ -62,6 +67,10 @@ def load_config(path: str = "config.yaml") -> AppConfig:
         conflict_velocity_threshold=float(raw.get("conflict_velocity_threshold", 15.0)),
         conflict_frames_required=int(raw.get("conflict_frames_required", 5)),
         zones=zones,
+        breakin_loiter_seconds=float(raw.get("breakin_loiter_seconds", 45.0)),
+        breakin_crouch_threshold=float(raw.get("breakin_crouch_threshold", 0.75)),
+        breakin_after_hours_start=int(raw.get("breakin_after_hours_start", 23)),
+        breakin_after_hours_end=int(raw.get("breakin_after_hours_end", 6)),
         self_learning_enabled=bool(raw.get("self_learning_enabled", True)),
         self_learning_conf_threshold=float(raw.get("self_learning_conf_threshold", 0.70)),
         self_learning_min_samples=int(raw.get("self_learning_min_samples", 50)),

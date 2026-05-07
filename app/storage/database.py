@@ -45,14 +45,28 @@ class Database:
             pass  # Column already exists
         self._conn.commit()
 
-    def log_event(self, event: AlertEvent):
-        self._conn.execute(
+    def log_event(self, event: AlertEvent) -> int:
+        cur = self._conn.execute(
             "INSERT INTO events (timestamp, event_type, confidence_score, metadata, frame_number) "
             "VALUES (?, ?, ?, ?, ?)",
             (event.timestamp, event.event_type, event.confidence_score,
              json.dumps(event.metadata), event.frame_number)
         )
         self._conn.commit()
+        return cur.lastrowid
+
+    def update_description(self, alert_id: int, description: str):
+        row = self._conn.execute(
+            "SELECT metadata FROM events WHERE id = ?", (alert_id,)
+        ).fetchone()
+        if row:
+            meta = json.loads(row[0] or "{}")
+            meta["ai_description"] = description
+            self._conn.execute(
+                "UPDATE events SET metadata = ? WHERE id = ?",
+                (json.dumps(meta), alert_id)
+            )
+            self._conn.commit()
 
     def get_recent_events(self, limit: int = 50) -> List[dict]:
         cursor = self._conn.execute(
